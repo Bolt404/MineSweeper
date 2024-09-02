@@ -8,9 +8,9 @@
         Title="MainWindow" Height="800" Width="800">
     <StackPanel>
         <WrapPanel Height="100" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBox TextWrapping="Wrap" Text="TextBox" Width="200" HorizontalAlignment="Center" VerticalAlignment="Center" Height="100" TextAlignment="Center" FontSize="48"/>
-            <Button Content="Button" Width="80" Click="Button_Click"/>
-            <TextBox TextWrapping="Wrap" Text="TextBox" Width="200" HorizontalAlignment="Center" VerticalAlignment="Center" Height="100" TextAlignment="Center" FontSize="48"/>
+            <TextBox TextWrapping="Wrap" Text="{Binding CountClicks}" x:Name="TbClicks" Width="200" HorizontalAlignment="Center" VerticalAlignment="Center" Height="100" TextAlignment="Center" FontSize="48" IsReadOnly="True"/>
+            <Button Content="RESTART" Width="80" Click="Button_Click"/>
+            <TextBox TextWrapping="Wrap" Text="TextBox" x:Name="TbTime" Width="200" HorizontalAlignment="Center" VerticalAlignment="Center" Height="100" TextAlignment="Center" FontSize="48"/>
         </WrapPanel>
         <Border BorderBrush="Black"
                 BorderThickness="2"

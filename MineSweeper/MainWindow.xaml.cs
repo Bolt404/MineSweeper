@@ -9,24 +9,73 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.ComponentModel;
+using System.Diagnostics.Eventing.Reader;
+using System.Windows.Threading;
 
 namespace MineSweeper
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private DispatcherTimer _timer;
+        private int _elapsedTime;
+
+        private int _revealedFieldsCount;
+
         Random random = new Random();
+
         int numberOfColumns;
         int numberOfRows;
+        int numberOfMines;
+
         Field[,] fieldsArray;
+        List<Field> minesArray = new List<Field>();
+
+        bool gameOver = false;
+        int gameOverCnt = 0;
+
+        private int _countClicks;
+        public int CountClicks
+        {
+            get { return _countClicks; }
+            set
+            {
+                Debug.WriteLine($"CountClicks: {value} SETTER");
+                _countClicks = value;
+                OnPropertyChanged(nameof(CountClicks));
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void Timer_Tick(object sender, EventArgs e)
+        {
+            _elapsedTime++;
+            TbTime.Text = FormatTime(_elapsedTime);  
+        }
+
+
+        protected void OnPropertyChanged(string propertyName)
+        {
+            Debug.WriteLine($"PropertyChanged: {propertyName}");
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
 
         public MainWindow()
         {
             //xaml stuff
             InitializeComponent();
+
+            // Timer initialization
+            _timer = new DispatcherTimer();
+            _timer.Interval = TimeSpan.FromSeconds(1);
+            _timer.Tick += Timer_Tick;
 
             //Counting my grid
             numberOfColumns = GrdMineField.ColumnDefinitions.Count;
@@ -36,33 +85,110 @@ namespace MineSweeper
             fieldsArray = new Field[numberOfRows, numberOfColumns];
 
             //InitGame yes please.
+            this.DataContext = this;
             InitGame();
+
+            
         }
 
+        // Need to format this apperently
+        private string FormatTime(int elapsedTime)
+        {
+            int minutes = elapsedTime / 60;
+            int seconds = elapsedTime % 60;
+            return $"{minutes:00}:{seconds:00}";
+        }
+
+        //  Init game setting up th game.
         public void InitGame()
         {
+            _revealedFieldsCount = 0;
+
+            _elapsedTime = 0;
+            TbTime.Text = "00:00";
+
+            gameOverCnt = 0;
+            gameOver = false;
+
+            CountClicks = 0;
+
             fieldsArray = new Field[numberOfRows, numberOfColumns];
+
             GrdMineField.Children.Clear();
+
             SetupMineField();
             SetupMines(10);
+            CheckForMines();
 
+            _timer.Start();
+        }
+
+        //Checking for mines
+        public void CheckForMines()
+        {
             foreach (var item in fieldsArray)
             {
                 List<Field> itemBorders = CheckBorderFields(item);
                 int count = 0;
                 foreach (Field field in itemBorders)
                 {
-                    
+
                     if (field.IsMine)
                     {
                         count++;
                     }
-                    
+
 
                 }
                 item.AdjacentMines = count;
-                item.Button.Content = count;
+                
+
             }
+        }
+
+
+        private void RevealField(Field field)
+        {
+
+           
+            if (field.IsMine && field != null)
+            {
+                
+                field.Button.Content = "💣";
+
+                field.Button.IsEnabled = false;
+                field.Button.Background = Brushes.Red;
+
+                gameOver = true;    
+                    
+            }  else if (!field.IsRevealed)
+            {
+                _revealedFieldsCount++;
+                field.IsRevealed = true;
+                field.Button.Content = field.AdjacentMines;
+                field.Button.IsEnabled = false;
+            } else
+            {
+                Debug.WriteLine("Something went wrong");
+            }
+
+            CheckIfPlayerWon();
+
+            if (gameOver && gameOverCnt == 0)
+            {
+                gameOverCnt++;
+                GameOver();
+            }
+        }
+
+        private void GameOver()
+        {
+            _timer.Stop();
+            foreach (var item in fieldsArray)
+            {
+                RevealField(item);
+            }
+
         }
 
         private void SetupMineField()
@@ -75,22 +201,16 @@ namespace MineSweeper
                 for (int Y = 0; Y < numberOfColumns; Y++)
                 {
                     Button mybutton = new Button();
+                    //Adds tag to button for later use
+                    mybutton.Tag = (X, Y);
 
-                    Field field = new Field(X, Y);
-                    field.Button = mybutton;
-                    field.IsRevealed = false;
+                    Field field = new Field(X, Y, mybutton);
 
                     Grid.SetColumn(mybutton, Y);
                     Grid.SetRow(mybutton, X);
 
                     //Row X, Column Y
                     String pos = $"{X},{Y}";
-
-                    //DEBUG CONTENT
-                    mybutton.Content = pos;
-
-                    //Setting Button ID to be equal to field
-                    //mybutton.Name = field.id.ToString();
 
                     //Adding listener for clicking
                     mybutton.Click += (Button_Field_Click);
@@ -109,9 +229,79 @@ namespace MineSweeper
             Debug.WriteLine($"Number of Columns:{numberOfColumns} | Number of Rows:{numberOfRows}");
         }
 
+        private void CheckIfPlayerWon()
+        {
+
+
+            int totalFields = numberOfRows * numberOfColumns;
+
+            Debug.WriteLine($"Revealed Fields: {_revealedFieldsCount} | Mines: {numberOfMines} | Total Fields: {totalFields}");
+            if (_revealedFieldsCount + numberOfMines == totalFields)
+            {
+                gameOver = true;
+
+                // Stop the timer
+                _timer.Stop();
+
+                // Format the message with time and clicks
+                string message = $"Congratulations, you won!\n" +
+                                 $"Time: {_elapsedTime}\n" +
+                                 $"Clicks: {CountClicks}";
+
+                // Display the message box
+                MessageBox.Show(message, "Game Won", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                InitGame();
+            }
+        }
+
+        private void FakeFloodFill(Field field)
+        {
+            List<Field> bordersfields = new List < Field > (CheckBorderFields(field));
+            foreach (Field item in bordersfields)
+            {
+
+
+                if (!item.IsMine && !item.IsRevealed && item.AdjacentMines == 0)
+                {
+                    //We have to maniuplate the button and field here, since we are not clicking it
+                    item.IsRevealed = true;
+                    _revealedFieldsCount++;
+                    RemoveButton(item.Button);
+                    FakeFloodFill(item);
+                }
+                else if (!item.IsRevealed)
+                {
+                    RevealField(item);
+                }
+            }
+
+
+        }
+
         private void Button_Field_Click( object sender, RoutedEventArgs e)
         {
-            RemoveButton(sender);
+            //Finding button that fits with field.
+            if (sender is Button clickedButton && clickedButton.Tag is (int row, int col))
+            {
+                CountClicks++;
+                Debug.WriteLine($"{CountClicks} clicks");
+                Field findField = fieldsArray[row, col];
+
+                //Checking if null, might be redundant.
+                if (findField != null && findField.AdjacentMines == 0)
+                {
+                    FakeFloodFill(findField);
+                    
+                    Debug.WriteLine($"{findField.Row},{findField.Column}");
+                    
+                }
+                else
+                {
+                    RevealField(findField);
+                }
+            }
+
         }
 
         private void Button_Click(object sender, RoutedEventArgs e)
@@ -121,8 +311,10 @@ namespace MineSweeper
 
         public void SetupMines(int mineCount)
         {
+            numberOfMines = mineCount;
             int minesPlaced = 0;
             int totalFields = fieldsArray.Length;
+
             Debug.WriteLine($"List of Fields = {totalFields}");
 
             while (minesPlaced < mineCount)
@@ -135,11 +327,14 @@ namespace MineSweeper
                 // Ensure we don't place a mine where there's already one
                 if (!selectedField.IsMine)
                 {
-                    selectedField.IsMine = true;
-                    selectedField.Button.Background = System.Windows.Media.Brushes.Red;
-                    minesPlaced++;
+                    //UNCOMMENT TO SEE MINES
+                    //selectedField.Button.Content = "💣";
 
-                    Debug.WriteLine($"Mine placed at: {selectedField.Row}, {selectedField.Column}");
+                    selectedField.IsMine = true;
+
+                    minesPlaced++;
+                    minesArray.Add(selectedField);
+
                 } else
                 {
                     Debug.WriteLine($"Already a mine at: {selectedField.Row}, {selectedField.Column}");
@@ -154,34 +349,19 @@ namespace MineSweeper
             int Y = field.Column;
             List<Field> borderingFields = new List<Field>();
 
-            Debug.WriteLine($"I AM {field.Row},{field.Column}");
-
             for (int XToCheck = -1; XToCheck <= 1; XToCheck++)
             {
                 for (int YToCheck = -1; YToCheck <= 1; YToCheck++)
                 {
                     int checkfieldx = XToCheck + X;
                     int checkfieldy = YToCheck + Y;
-                    // Skip the current field itself
-                    if (XToCheck == 0 && YToCheck == 0)
-                    {
-                        continue;
-                    }
-                    // Check if the neighboring field is within bounds (assuming grid size is 10x10)
-                    else if (checkfieldx >= 0 && checkfieldx < numberOfRows && checkfieldy >= 0 && checkfieldy < numberOfColumns)
-                    {
-                        Debug.WriteLine($"This one is next to me: {checkfieldx},{checkfieldy}");
 
-                        // Assuming you already have instances of Field objects in the fieldsArray
+                    if (checkfieldx >= 0 && checkfieldx < numberOfRows && checkfieldy >= 0 && checkfieldy < numberOfColumns)
+                    {
                         Field neighboringField = fieldsArray[checkfieldx, checkfieldy];
                         borderingFields.Add(neighboringField);
                     }
-                    //CHECK <0 and >9, check if filed.row & column - Then skip
-                    //COUNT NUMBER OF MINES
-                    //RETURN -- LIST OF FIELDS --
-                    //HAVE LOGIC FOR NUMBER OF MINES BE SOME WHERE ELSE
                 }
-
             }
 
 
@@ -193,15 +373,14 @@ namespace MineSweeper
 
         public void RemoveButton(object sender)
         {
+
             if (sender is Button clickedButton)
             {
-                // Remove the clicked button from the grid
-                GrdMineField.Children.Remove(clickedButton);
+                Debug.WriteLine($"Button at position {clickedButton.Tag} was clicked and removed.");
 
-                // Optional: Debugging output
-                Debug.WriteLine($"Button at position {clickedButton.Content} was clicked and removed.");
+                GrdMineField.Children.Remove(clickedButton);
             }
-            Debug.WriteLine($"{sender} REMOVED!");
+
         }
 
     }

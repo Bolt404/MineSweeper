@@ -11,7 +11,7 @@ namespace MineSweeper
     public class Field
     {
         // Constructor to initialize the Field with row and column values
-        public Field(int row, int column)
+        public Field(int row, int column, Button button)
         {
             Debug.WriteLine($"FIELD MADE WITH ROW:{row} - COLUMN:{column}");
             Row = row;
@@ -20,6 +20,7 @@ namespace MineSweeper
             IsRevealed = false;  // Default to not revealed
             AdjacentMines = 0;  // Default to 0; calculate this after mine placement
             id = int.Parse(row.ToString() + column.ToString());
+            Button = button;
         }
 
 
