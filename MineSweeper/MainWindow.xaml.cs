@@ -172,12 +172,14 @@ namespace MineSweeper
                 Debug.WriteLine("Something went wrong");
             }
 
-            CheckIfPlayerWon();
 
             if (gameOver && gameOverCnt == 0)
             {
                 gameOverCnt++;
                 GameOver();
+            } else if (!gameOver)
+            {
+                CheckIfPlayerWon();
             }
         }
 
@@ -188,6 +190,13 @@ namespace MineSweeper
             {
                 RevealField(item);
             }
+            // Format the message with time and clicks
+            string message = $"You Lost!\n" +
+                             $"Time: {_elapsedTime}\n" +
+                             $"Clicks: {CountClicks}";
+
+            // Display the message box
+            MessageBox.Show(message, "Game Over!", MessageBoxButton.OK, MessageBoxImage.Information);
 
         }
 
@@ -363,10 +372,6 @@ namespace MineSweeper
                     }
                 }
             }
-
-
-
-           
             return borderingFields;
         }
 
