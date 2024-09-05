@@ -22,6 +22,7 @@ namespace MineSweeper
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+
         private DispatcherTimer _timer;
         private int _elapsedTime;
 
@@ -102,6 +103,7 @@ namespace MineSweeper
         //  Init game setting up th game.
         public void InitGame()
         {
+            BtnRestart.Content = "😎";
             _revealedFieldsCount = 0;
 
             _elapsedTime = 0;
@@ -185,6 +187,7 @@ namespace MineSweeper
 
         private void GameOver()
         {
+            BtnRestart.Content = "😵";
             _timer.Stop();
             foreach (var item in fieldsArray)
             {
